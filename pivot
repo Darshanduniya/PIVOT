@@ -1,0 +1,76 @@
+import pymonetdb
+from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+
+def map_and_insert_columns(source_table, column_name_1, target_table):
+    # Connect to the MonetDB database
+    connection = pymonetdb.connect(username='your_username', password='your_password', hostname='your_hostname', database='your_database')
+    cursor = connection.cursor()
+
+    # Query to fetch the data from Source_table and perform the mapping
+    query = f"""
+    SELECT {column_name_1},
+           {column_name_1}_desc,
+           {column_name_1}_qty
+    FROM {source_table}
+    """
+
+    # Execute the query
+    cursor.execute(query)
+
+    # Fetch the results
+    results = cursor.fetchall()
+
+    # Print the data
+    print("Mapped data from Source_table:")
+    for row in results:
+        column_name_1_value, column_name_1_desc, column_name_1_qty = row
+        print(f"Column_name_1: {column_name_1_value}, Column_name_1_desc: {column_name_1_desc}, Column_name_1_qty: {column_name_1_qty}")
+
+    # Insert the mapped data into the Target_table
+    for row in results:
+        column_name_1_value, column_name_1_desc, column_name_1_qty = row
+        insert_query = f"""
+        INSERT INTO {target_table} (Column_name_1_desc, Column_name_1_qty)
+        VALUES ('{column_name_1_desc}', {column_name_1_qty})
+        """
+        cursor.execute(insert_query)
+
+    # Commit the changes
+    connection.commit()
+
+    # Close the connection
+    connection.close()
+
+# Define the DAG
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'start_date': datetime(2023, 7, 20),
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
+
+dag = DAG(
+    'monetdb_mapping_dag',
+    default_args=default_args,
+    schedule_interval='@once',
+    catchup=False,
+)
+
+# Create a PythonOperator to execute the mapping function
+mapping_task = PythonOperator(
+    task_id='mapping_task',
+    python_callable=map_and_insert_columns,
+    op_args=['Source_table', 'Column_name_1', 'Target_table'],  # Replace with your actual table names
+    dag=dag,
+)
+
+# Set the task dependencies
+mapping_task
+
+if __name__ == "__main__":
+    dag.cli()
