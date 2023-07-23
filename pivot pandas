@@ -1,0 +1,45 @@
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+from airflow.utils.dates import days_ago
+import pandas as pd
+import monetdb.sql
+
+def unpivot(df, id_vars, value_vars, var_name='variable', value_name='value'):
+    return pd.melt(df, id_vars=id_vars, value_vars=value_vars, var_name=var_name, value_name=value_name)
+
+def load_data_from_monetdb():
+    # Connect to MonetDB
+    conn = monetdb.sql.connect(username='monetdb', password='monetdb', hostname='localhost', database='mydatabase')
+
+    # Load data from MonetDB into a Pandas DataFrame
+    df = pd.read_sql('SELECT * FROM darshan_pivot', conn)
+
+    # Unpivot the attribute_codeset column with respect to attribute_key and attribute_description
+    df_unpivoted = unpivot(df, id_vars=['item_id_key', 'country_key', 'subcategory_key'], value_vars=['attribute_codeset'], var_name='attribute_key', value_name='attribute_description')
+
+    print(df_unpivoted)
+
+# Define DAG settings
+dag_id = 'unpivot_data_from_monetdb'
+schedule_interval = '0 0 * * *'  # Daily at midnight (UTC)
+start_date = days_ago(1)  # Start the DAG one day ago to avoid immediate execution
+
+# Instantiate DAG
+dag = DAG(
+    dag_id=dag_id,
+    schedule_interval=schedule_interval,
+    start_date=start_date
+)
+
+# Create Airflow task
+unpivot_task = PythonOperator(
+    task_id='unpivot_data_task',
+    python_callable=load_data_from_monetdb,
+    dag=dag
+)
+
+# Define task dependencies, if any
+# (No dependencies in this case as it's a single task DAG)
+unpivot_task
+
+# Save the DAG file in your Airflow DAGs directory with the name "unpivot_data_from_monetdb.py"
