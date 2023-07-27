@@ -1,0 +1,13 @@
+    existing_columns = df1.keys()
+    column_mapping = {}
+    for old_column in existing_columns:
+        new_column = old_column.replace('acc_p', 'p') + '_key'
+        column_mapping[old_column] = new_column
+    df1 = {column_mapping[col]: df1[col] for col in df1.keys()}
+
+    existing_columns = df2.keys()
+    column_mapping = {}
+    for old_column in existing_columns:
+        new_column = old_column.replace('acc_p', 'p') + '_key'
+        column_mapping[old_column] = new_column
+    df2 = {column_mapping[col]: df2[col] for col in df2.keys()}
