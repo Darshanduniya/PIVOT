@@ -1,0 +1,77 @@
+import pymonet
+import pandas as pd
+
+def load_data_from_monet():
+    # Connect to the MonetDB database
+    conn = pymonet.connect(username='your_username', host='your_host', password='your_password', port=23487, database='your_database')
+    cursor = conn.cursor()
+
+    # Fetch the data from the database
+    cursor.execute('SELECT * FROM "DARSHAN" LIMIT 50')
+    rows = cursor.fetchall()
+
+    # Convert the data into a list of dictionaries
+    data = []
+    columns = [desc[0] for desc in cursor.description]
+    for row in rows:
+        data.append(dict(zip(columns, row)))
+
+    # Convert the list of dictionaries into a pivot table-like data structure
+    df1 = {}
+    df2 = {}
+    for entry in data:
+        key = (entry['item_id_key'], entry['subcategory_key'], entry['country_key'])
+        attribute_codeset = entry['attribute_codeset']
+        attribute_key = entry['attribute_key']
+        attribute_description = entry['attribute_description']
+
+        # Create pivot tables for attribute_key and attribute_description
+        if key not in df1:
+            df1[key] = {}
+        df1[key][attribute_codeset] = attribute_key
+
+        if key not in df2:
+            df2[key] = {}
+        df2[key][attribute_codeset] = attribute_description
+
+    # Convert the pivot tables to a merged dataframe-like data structure
+    merged_data = []
+    for key in df1.keys():
+        row = dict(key)
+        row.update(df1[key])
+        row.update(df2[key])
+        merged_data.append(row)
+
+    # Create a table with dynamically determined data types based on column names
+    create_table_sql = "CREATE TABLE IF NOT EXISTS my_dynamic_table ("
+    for col in merged_data[0].keys():
+        data_type = "INT" if "_key" in col else "VARCHAR(300)"
+        create_table_sql += f"{col} {data_type}, "
+    create_table_sql = create_table_sql.rstrip(", ") + ");"
+    
+    cursor.execute(create_table_sql)
+
+    # Insert values into the table
+    for row in merged_data:
+        insert_values_sql = "INSERT INTO my_dynamic_table ("
+        for col in row.keys():
+            insert_values_sql += col + ", "
+        insert_values_sql = insert_values_sql.rstrip(", ") + ") VALUES ("
+
+        for value in row.values():
+            if isinstance(value, int):
+                insert_values_sql += f"{value}, "
+            else:
+                insert_values_sql += f"'{value}', "
+
+        insert_values_sql = insert_values_sql.rstrip(", ") + ");"
+        cursor.execute(insert_values_sql)
+
+    # Commit changes and close the connection
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+# Assuming 'merged_df' is the merged dataframe-like data structure from the previous example
+# Call the function to create and insert data into the table
+load_data_from_monet()
