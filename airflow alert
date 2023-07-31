@@ -1,0 +1,53 @@
+import psutil
+import smtplib
+from email.mime.text import MIMEText
+import subprocess
+
+def is_airflow_running():
+    for proc in psutil.process_iter(['pid', 'name']):
+        if 'airflow' in proc.info['name'].lower():
+            return True
+    return False
+
+def send_email_alert():
+    sender_email = 'your_email@example.com'
+    receiver_email = 'recipient@example.com'
+    smtp_server = 'your_smtp_server'
+    smtp_port = 587  # Replace with the appropriate port for your SMTP server
+    smtp_username = 'your_smtp_username'
+    smtp_password = 'your_smtp_password'
+
+    msg = MIMEText('Airflow is down!')  # Email body
+    msg['Subject'] = 'Airflow Alert'
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()  # Use TLS for encryption
+        server.login(smtp_username, smtp_password)
+        server.sendmail(sender_email, [receiver_email], msg.as_string())
+        server.quit()
+        print('Email alert sent successfully.')
+    except Exception as e:
+        print('Error sending email:', e)
+
+def execute_commands():
+    # Replace these commands with the actual commands you want to run
+    commands = [
+        'cd /path/to/command1_directory && command1',
+        'cd /path/to/command2_directory && command2',
+        'cd /path/to/command3_directory && command3',
+    ]
+
+    for command in commands:
+        try:
+            subprocess.run(command, shell=True, check=True)
+            print(f"Command executed successfully: {command}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing command: {command}, Error: {e}")
+
+if __name__ == '__main__':
+    if not is_airflow_running():
+        send_email_alert()
+        execute_commands()
