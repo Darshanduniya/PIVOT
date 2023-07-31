@@ -1,0 +1,88 @@
+from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+import psutil
+import smtplib
+from email.mime.text import MIMEText
+import subprocess
+
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'start_date': datetime(2023, 7, 31),
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
+
+dag = DAG(
+    'airflow_monitoring',
+    default_args=default_args,
+    description='Check if Airflow is running and execute commands if not',
+    schedule_interval=timedelta(minutes=30),
+)
+
+def is_airflow_running():
+    for proc in psutil.process_iter(['pid', 'name']):
+        if 'airflow' in proc.info['name'].lower():
+            return True
+    return False
+
+def send_email_alert():
+    sender_email = 'your_email@example.com'
+    receiver_email = 'recipient@example.com'
+    smtp_server = 'your_smtp_server'
+    smtp_port = 587
+    smtp_username = 'your_smtp_username'
+    smtp_password = 'your_smtp_password'
+
+    msg = MIMEText('Airflow is down!')
+    msg['Subject'] = 'Airflow Alert'
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.sendmail(sender_email, [receiver_email], msg.as_string())
+        server.quit()
+        print('Email alert sent successfully.')
+    except Exception as e:
+        print('Error sending email:', e)
+
+def execute_commands():
+    commands = [
+        'cd /path/to/command1_directory && command1',
+        'cd /path/to/command2_directory && command2',
+        'cd /path/to/command3_directory && command3',
+    ]
+
+    for command in commands:
+        try:
+            subprocess.run(command, shell=True, check=True)
+            print(f"Command executed successfully: {command}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing command: {command}, Error: {e}")
+
+check_airflow_task = PythonOperator(
+    task_id='check_airflow',
+    python_callable=is_airflow_running,
+    dag=dag,
+)
+
+send_email_task = PythonOperator(
+    task_id='send_email_alert',
+    python_callable=send_email_alert,
+    dag=dag,
+)
+
+execute_commands_task = PythonOperator(
+    task_id='execute_commands',
+    python_callable=execute_commands,
+    dag=dag,
+)
+
+check_airflow_task >> send_email_task
+check_airflow_task >> execute_commands_task
