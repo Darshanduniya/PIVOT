@@ -1,0 +1,34 @@
+from airflow import DAG
+from airflow.contrib.operators.ssh_operator import SSHOperator
+from airflow.utils.dates import days_ago
+from datetime import timedelta
+
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'start_date': days_ago(1),
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
+
+dag = DAG(
+    'execute_remote_python_script',
+    default_args=default_args,
+    description='DAG to execute a Python script on a remote server using SSH',
+    schedule_interval=timedelta(days=1),  # Set the desired schedule interval
+)
+
+remote_script_path = '/path/to/remote_script.py'  # Update with the actual path of the Python script on the remote server
+
+# SSH connection parameters
+ssh_conn_id = 'my_ssh_connection'  # Replace with the Airflow SSH connection ID configured in Airflow UI
+
+# Define the SSHOperator to execute the Python script on the remote server
+execute_remote_python = SSHOperator(
+    task_id='execute_remote_python',
+    ssh_conn_id=ssh_conn_id,
+    command=f'python {remote_script_path}',  # Execute the Python script on the remote server
+    dag=dag,
+)
+
+execute_remote_python
