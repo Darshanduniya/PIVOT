@@ -1,0 +1,31 @@
+import psutil
+import time
+import smtplib
+
+def is_airflow_running():
+    for proc in psutil.process_iter(['pid','name']):
+        if 'airflow' in proc.info['name'].lower():
+            print('Airflow process is running. PID:{}'.format(proc.info['pid']))
+            return True
+    print('Airflow process is not running')
+    return False
+
+def send_email_alert(status):
+    from_addr = 'alerts@example.com'
+    to_addrs = ['admin@example.com']
+    subject = 'Airflow status'
+    message = ''
+
+    if status == 'running':
+        message = 'Airflow is running.'
+    else:
+        message = 'Airflow is not running.'
+
+    with smtplib.SMTP('localhost', 25) as smtp:
+        smtp.sendmail(from_addr, to_addrs, message)
+
+if _name_ == '_main_':
+    if not is_airflow_running():
+        send_email_alert('not running')
+    else:
+        send_email_alert('running')
