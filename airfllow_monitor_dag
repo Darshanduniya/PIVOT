@@ -1,0 +1,35 @@
+import airflow
+from airflow.operators.python_operator import PythonOperator
+
+dag = airflow.DAG('airflow_alert_dag', schedule_interval='@daily')
+
+def send_email_alert(status):
+    from_addr = 'alerts@example.com'
+    to_addrs = ['admin@example.com']
+    subject = 'Airflow status'
+    message = ''
+
+    if status == 'running':
+        message = 'Airflow is running.'
+    else:
+        message = 'Airflow is not running.'
+
+    with airflow.models.SmtpOperator(
+        task_id='send_email_alert',
+        from_addr=from_addr,
+        to_addrs=to_addrs,
+        subject=subject,
+        message=message,
+    ) as task:
+        yield task
+
+is_airflow_running = PythonOperator(
+    task_id='is_airflow_running',
+    python_callable=is_airflow_running,
+)
+
+send_email_alert_running = send_email_alert(status='running')
+send_email_alert_not_running = send_email_alert(status='not running')
+
+is_airflow_running >> send_email_alert_running
+is_airflow_running >> send_email_alert_not_running
