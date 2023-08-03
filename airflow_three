@@ -1,0 +1,42 @@
+import psutil
+import smtplib
+from email.mime.text import MIMEText
+
+def is_airflow_running():
+    for proc in psutil.process_iter(['pid', 'name']):
+        if 'airflow' in proc.info['name'].lower():
+            print('Airflow process is running. PID: {}'.format(proc.info['pid']))
+            return True
+    print('Airflow process is not running')
+    return False
+
+def send_email(subject, body):
+    # Replace the following with your SMTP server details
+    smtp_server = 'your_smtp_server'
+    smtp_port = 587
+    smtp_username = 'your_smtp_username'
+    smtp_password = 'your_smtp_password'
+    sender_email = 'your_sender_email@example.com'
+    receiver_email = 'your_receiver_email@example.com'
+
+    # Create a MIMEText object to represent the email
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+
+    # Connect to the SMTP server, start TLS, and login
+    server = smtplib.SMTP(smtp_server, smtp_port)
+    server.starttls()
+    server.login(smtp_username, smtp_password)
+
+    # Send the email and close the connection
+    server.sendmail(sender_email, [receiver_email], msg.as_string())
+    server.quit()
+
+if __name__ == "__main__":
+    airflow_running = is_airflow_running()
+    if airflow_running:
+        send_email("Airflow Process Alert", "The Airflow process is running.")
+    else:
+        send_email("Airflow Process Alert", "The Airflow process is not running.")
